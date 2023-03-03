@@ -157,7 +157,9 @@ func (g *GitGetter) GetFile(dst string, u *url.URL) error {
 	// just get the repository directly.
 	filename := filepath.Base(u.Path)
 	u.Path = filepath.Dir(u.Path)
-
+	if runtime.GOOS == `windows` {
+		u.Path = strings.ReplaceAll(u.Path, "\\", "/")
+	}
 	// Get the full repository
 	if err := g.Get(td, u); err != nil {
 		return err
