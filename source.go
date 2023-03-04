@@ -10,10 +10,10 @@ import (
 // the subdir and the subdir.
 //
 // ex:
-//   dom.com/path/?q=p               => dom.com/path/?q=p, ""
-//   proto://dom.com/path//*?q=p     => proto://dom.com/path?q=p, "*"
-//   proto://dom.com/path//path2?q=p => proto://dom.com/path?q=p, "path2"
 //
+//	dom.com/path/?q=p               => dom.com/path/?q=p, ""
+//	proto://dom.com/path//*?q=p     => proto://dom.com/path?q=p, "*"
+//	proto://dom.com/path//path2?q=p => proto://dom.com/path?q=p, "path2"
 func SourceDirSubdir(src string) (string, string) {
 
 	// URL might contains another url in query parameters
@@ -28,15 +28,16 @@ func SourceDirSubdir(src string) (string, string) {
 	if idx := strings.Index(src[:stop], "://"); idx > -1 {
 		offset = idx + 3
 	}
+	subdir := ""
 
 	// First see if we even have an explicit subdir
 	idx := strings.Index(src[offset:stop], "//")
 	if idx == -1 {
-		return src, ""
+		return src, subdir
 	}
 
 	idx += offset
-	subdir := src[idx+2:]
+	subdir = src[idx+2:]
 	src = src[:idx]
 
 	// Next, check if we have query parameters and push them onto the

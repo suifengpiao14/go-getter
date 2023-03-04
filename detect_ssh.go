@@ -1,10 +1,8 @@
 package getter
 
 import (
-	"fmt"
 	"net/url"
 	"regexp"
-	"strings"
 )
 
 // Note that we do not have an SSH-getter currently so this file serves
@@ -27,23 +25,17 @@ func detectSSH(src string) (*url.URL, error) {
 	user := matched[1]
 	host := matched[2]
 	path := matched[3]
-	qidx := strings.Index(path, "?")
-	if qidx == -1 {
-		qidx = len(path)
+	tmpU, err := url.Parse(path)
+	if err != nil {
+		return nil, err
 	}
-
 	var u url.URL
 	u.Scheme = "ssh"
 	u.User = url.User(user)
 	u.Host = host
-	u.Path = path[0:qidx]
-	if qidx < len(path) {
-		q, err := url.ParseQuery(path[qidx+1:])
-		if err != nil {
-			return nil, fmt.Errorf("error parsing GitHub SSH URL: %s", err)
-		}
-		u.RawQuery = q.Encode()
-	}
+	u.Path = tmpU.Path
+	u.RawQuery = tmpU.RawQuery
+	u.Fragment = tmpU.Fragment
 
 	return &u, nil
 }

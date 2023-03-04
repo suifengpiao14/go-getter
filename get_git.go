@@ -19,6 +19,7 @@ import (
 	urlhelper "github.com/hashicorp/go-getter/helper/url"
 	safetemp "github.com/hashicorp/go-safetemp"
 	version "github.com/hashicorp/go-version"
+	"github.com/pkg/errors"
 )
 
 // GitGetter is a Getter implementation that will download a module from
@@ -39,6 +40,10 @@ func (g *GitGetter) ClientMode(_ *url.URL) (ClientMode, error) {
 }
 
 func (g *GitGetter) Get(dst string, u *url.URL) error {
+	copyUrl := *u
+	copyUrl.Fragment = "" // drop Fragement ,rawQuery
+	copyUrl.RawQuery = ""
+	copyUrl.ForceQuery = false
 	ctx := g.Context()
 
 	if g.Timeout > 0 {
@@ -57,7 +62,7 @@ func (g *GitGetter) Get(dst string, u *url.URL) error {
 	//
 	// This is not necessary in versions of Go which have patched
 	// CVE-2019-14809 (e.g. Go 1.12.8+)
-	if portStr := u.Port(); portStr != "" {
+	if portStr := copyUrl.Port(); portStr != "" {
 		if _, err := strconv.ParseUint(portStr, 10, 16); err != nil {
 			return fmt.Errorf("invalid port number %q; if using the \"scp-like\" git address scheme where a colon introduces the path instead, remove the ssh:// portion and use just the git:: prefix", portStr)
 		}
@@ -66,7 +71,7 @@ func (g *GitGetter) Get(dst string, u *url.URL) error {
 	// Extract some query parameters we use
 	var ref, sshKey string
 	depth := 0 // 0 means "don't use shallow clone"
-	q := u.Query()
+	q := copyUrl.Query()
 	if len(q) > 0 {
 		ref = q.Get("ref")
 		q.Del("ref")
@@ -78,11 +83,6 @@ func (g *GitGetter) Get(dst string, u *url.URL) error {
 			depth = n
 		}
 		q.Del("depth")
-
-		// Copy the URL
-		var newU url.URL = *u
-		u = &newU
-		u.RawQuery = q.Encode()
 	}
 
 	var sshKeyFile string
@@ -127,7 +127,7 @@ func (g *GitGetter) Get(dst string, u *url.URL) error {
 	if err == nil {
 		err = g.update(ctx, dst, sshKeyFile, ref, depth)
 	} else {
-		err = g.clone(ctx, dst, sshKeyFile, u, ref, depth)
+		err = g.clone(ctx, dst, sshKeyFile, &copyUrl, ref, depth)
 	}
 	if err != nil {
 		return err
@@ -156,9 +156,8 @@ func (g *GitGetter) GetFile(dst string, u *url.URL) error {
 	// Get the filename, and strip the filename from the URL so we can
 	// just get the repository directly.
 	filename := filepath.Base(u.Path)
-	u.Path = filepath.Dir(u.Path)
-	if runtime.GOOS == `windows` {
-		u.Path = strings.ReplaceAll(u.Path, "\\", "/")
+	if u.Fragment != "" {
+		filename = u.Fragment
 	}
 	// Get the full repository
 	if err := g.Get(td, u); err != nil {
@@ -218,6 +217,8 @@ func (g *GitGetter) clone(ctx context.Context, dst, sshKeyFile string, u *url.UR
 				return fmt.Errorf("%w (note that setting 'depth' requires 'ref' to be a branch or tag name)", err)
 			}
 		}
+
+		err = errors.WithMessagef(err, "cmd: %s", strings.Join(args, " "))
 		return err
 	}
 
